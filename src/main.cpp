@@ -1,19 +1,36 @@
 #include <heltec.h>
-#include <SimpleButton.h>
+#include<IoAbstraction.h>
 
 #include <images.h>
 #include <MSP.h>
 
-using namespace simplebutton;
+const int spinwheelClickPin = 26;
+const int encoderAPin = 14;
+const int encoderBPin = 27;
+const int maximumEncoderValue = 128;
 
 MSP msp;
-RotaryEncoder* myEncoder = NULL;
-int32_t previousPosition = 0;
+int16_t encValue;
 
 void logo(){
 	Heltec.display -> clear();
 	Heltec.display -> drawXbm(0,0,logo_width,logo_height,(const unsigned char *)logo_bits);
 	Heltec.display -> display();
+}
+
+void onSpinwheelClicked(pinid_t pin, bool heldDown) {
+  Serial.print("Button pressed ");
+  Serial.println(heldDown ? "Held" : "Pressed");
+}
+
+void onRepeatButtonClicked(pinid_t pin, bool heldDown) {
+  Serial.println("Repeat button pressed");
+}
+
+void onEncoderChange(int newValue) {
+  Serial.print("Encoder change ");
+  Serial.println(newValue);
+  encValue = newValue;
 }
 
 void setup()
@@ -25,7 +42,10 @@ void setup()
 	logo();
 	delay(3000);
 	
-	myEncoder = new RotaryEncoder	(14, 27, 26); // channel-A, channel-B, push button (255 = not used)
+	switches.initialise(ioUsingArduino(), true);
+	switches.addSwitch(spinwheelClickPin, onSpinwheelClicked);
+	setupRotaryEncoderWithInterrupt(encoderAPin, encoderBPin, onEncoderChange);
+	switches.changeEncoderPrecision(maximumEncoderValue, 100);
 
 	Serial.println("Encoder Started...");
 	Heltec.display->clear();
@@ -72,18 +92,12 @@ void setup()
 
 void loop()
 {
-    myEncoder->update();
-
-    int32_t currentPosition = myEncoder->getPos();
-
-    if (currentPosition != previousPosition) {
-        previousPosition = currentPosition;
-        Serial.print(currentPosition);
-        if (myEncoder->incremented()) Serial.println(" up");
-        if (myEncoder->decremented()) Serial.println(" down");
-    }
-
-    if (myEncoder->clicked()) {
-        Serial.println("clicked");
-    }
+	taskManager.runLoop();
+	char data[20];
+	sprintf(data, "Value %d", encValue);
+	Heltec.display -> setColor(BLACK);
+	Heltec.display -> fillRect(0,37,128,9);
+	Heltec.display -> setColor(WHITE);
+	Heltec.display -> drawString(2, 36, data);
+	Heltec.display -> display();
 }
